@@ -1,10 +1,16 @@
 #!/usr/bin/env python2
 
-from os import geteuid, devnull
+from os import devnull
 import logging
+
+from scapy.layers.inet import UDP, IP, TCP
+from scapy.layers.inet6 import IPv6
+from scapy.layers.snmp import SNMP
+
 # shut up scapy
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import *
+from scapy.layers.l2 import *
 conf.verb=0
 from sys import exit
 import binascii
@@ -983,8 +989,8 @@ def main(args):
 
     else:
         # Check for root
-        if geteuid():
-            exit('[-] Please run as root')
+        # if geteuid():
+        #     exit('[-] Please run as root')
 
         #Find the active interface
         if args.interface:

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 from os import devnull
 import logging
@@ -18,13 +18,13 @@ import struct
 import argparse
 import signal
 import base64
-from urllib import unquote
+from urllib.parse import unquote
 import platform
 from subprocess import Popen, PIPE, check_output
 from collections import OrderedDict
-from BaseHTTPServer import BaseHTTPRequestHandler
-from StringIO import StringIO
-from urllib import unquote
+from http.server import BaseHTTPRequestHandler
+from io import StringIO
+from urllib.parse import unquote
 #import binascii    #already imported on line 10
 # Debug
 #from IPython import embed
@@ -143,7 +143,10 @@ def pkt_parser(pkt):
     global pkt_frag_loads, mail_auths
 
     if pkt.haslayer(Raw):
-        load = pkt[Raw].load
+        try:
+            load = pkt[Raw].load.decode("UTF-8")
+        except UnicodeDecodeError:
+            return
 
     # Get rid of Ethernet pkts with just a raw load cuz these are usually network controls like flow control
     if pkt.haslayer(Ether) and pkt.haslayer(Raw) and not pkt.haslayer(IP) and not pkt.haslayer(IPv6):
@@ -215,10 +218,8 @@ def telnet_logins(src_ip_port, dst_ip_port, load, ack, seq):
     if src_ip_port in telnet_stream:
         # Do a utf decode in case the client sends telnet options before their username
         # No one would care to see that
-        try:
-            telnet_stream[src_ip_port] += load.decode('utf8')
-        except UnicodeDecodeError:
-            pass
+        telnet_stream[src_ip_port] += load
+
 
         # \r or \r\n or \n terminate commands in telnet if my pcaps are to be believed
         if '\r' in telnet_stream[src_ip_port] or '\n' in telnet_stream[src_ip_port]:
@@ -697,7 +698,7 @@ def parse_basic_auth(src_ip_port, dst_ip_port, headers, authorization_header):
         if b64_auth_re != None:
             basic_auth_b64 = b64_auth_re.group(1)
             try:
-                basic_auth_creds = base64.decodestring(basic_auth_b64)
+                basic_auth_creds = base64.b64decode(basic_auth_b64).decode("UTF-8")
             except Exception:
                 return
             msg = 'Basic Authentication: %s' % basic_auth_creds
@@ -833,7 +834,7 @@ def parse_netntlm_chal(headers, chal_header, ack):
             msg2 = header_val2[1]
         except IndexError:
             return
-        msg2 = base64.decodestring(msg2)
+        msg2 = base64.b64decode(msg2).decode("UTF-8")
         parse_ntlm_chal(msg2, ack)
 
 def parse_ntlm_chal(msg2, ack):
@@ -868,8 +869,8 @@ def parse_netntlm_resp_msg(headers, resp_header, seq):
     # The header value can either start with NTLM or Negotiate
     if header_val3[0] == 'NTLM' or header_val3[0] == 'Negotiate':
         try:
-            msg3 = base64.decodestring(header_val3[1])
-        except binascii.Error:
+            msg3 = base64.b64decode(header_val3[1]).decode("UTF-8")
+        except UnicodeDecodeError:
             return
         return parse_ntlm_resp(msg3, seq)
 
@@ -955,7 +956,7 @@ def printer(src_ip_port, dst_ip_port, msg):
                         if msg in contents:
                             return
 
-        print print_str
+        print(print_str)
 
         # Escape colors like whatweb has
         ansi_escape = re.compile(r'\x1b[^m]*m')
@@ -965,7 +966,7 @@ def printer(src_ip_port, dst_ip_port, msg):
         logging.info(print_str)
     else:
         print_str = '[%s] %s' % (src_ip_port.split(':')[0], msg)
-        print print_str
+        print(print_str)
 
 def main(args):
     ##################### DEBUG ##########################
@@ -982,6 +983,7 @@ def main(args):
     # Read packets from either pcap or interface
     if args.pcap:
         try:
+
             for pkt in PcapReader(args.pcap):
                 pkt_parser(pkt)
         except IOError:
@@ -997,7 +999,7 @@ def main(args):
             conf.iface = args.interface
         else:
             conf.iface = iface_finder()
-        print '[*] Using interface:', conf.iface
+        print('[*] Using interface:', conf.iface)
 
         if args.filterip:
             sniff(iface=conf.iface, prn=pkt_parser, filter="not host %s" % args.filterip, store=0)

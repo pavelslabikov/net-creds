@@ -9,7 +9,7 @@ from scapy.config import conf
 from scapy.sendrecv import sniff
 from scapy.utils import PcapReader
 
-from net_creds.parser import pkt_parser
+from net_creds.parser import parse_creds_from_packet
 
 DN = open(devnull, 'w')
 
@@ -59,7 +59,7 @@ if __name__ == "__main__":
         try:
 
             for pkt in PcapReader(args.pcap):
-                pkt_parser(pkt)
+                parse_creds_from_packet(pkt)
         except IOError:
             exit('[-] Could not open %s' % args.pcap)
 
@@ -76,6 +76,6 @@ if __name__ == "__main__":
         print('[*] Using interface:', conf.iface)
 
         if args.filterip:
-            sniff(iface=conf.iface, prn=pkt_parser, filter="not host %s" % args.filterip, store=0)
+            sniff(iface=conf.iface, prn=parse_creds_from_packet, filter="not host %s" % args.filterip, store=0)
         else:
-            sniff(iface=conf.iface, prn=pkt_parser, store=0)
+            sniff(iface=conf.iface, prn=parse_creds_from_packet, store=0)

@@ -4,15 +4,16 @@ import logging
 
 from scapy.layers.inet import UDP, IP, TCP
 from scapy.layers.inet6 import IPv6
+from scapy.layers.kerberos import Kerberos
 from scapy.layers.snmp import SNMP
 
-from net_creds.output import printer
 from net_creds.protocols.ftp import parse_ftp
 from net_creds.protocols.http import parse_http_load
 from net_creds.protocols.irc import irc_logins
-from net_creds.protocols.kerberos import ParseMSKerbv5TCP, ParseMSKerbv5UDP, Decode_Ip_Packet
+from net_creds.protocols.kerberos import parse_udp_kerberos, \
+    parse_tcp_kerberos
 from net_creds.protocols.mail import mail_logins
-from net_creds.protocols.ntlm import NTLMSSP2_re, NTLMSSP3_re, parse_netntlm, parse_ntlm_chal, parse_ntlm_resp
+from net_creds.protocols.ntlm import parse_netntlm, parse_nonnet_ntlm
 from net_creds.protocols.snmp import parse_snmp
 from net_creds.protocols.telnet import telnet_logins
 
@@ -27,7 +28,7 @@ logging.basicConfig(filename='../credentials.txt', level=logging.INFO)
 pkt_frag_loads = OrderedDict()
 
 
-def frag_remover():
+def remove_frags_if_necessary():
     '''
     Keep the FILO OrderedDict of frag loads from getting too large
     3 points of limit:
@@ -75,24 +76,21 @@ def frag_joiner(ack, src_ip_port, load):
     return OrderedDict([(ack, load)])
 
 
-def pkt_parser(pkt):
+def parse_creds_from_packet(pkt):
     '''
     Start parsing packets here
     '''
     global pkt_frag_loads
 
-    if pkt.haslayer(Raw):
-        try:
-            load = pkt[Raw].load.decode("UTF-8")
-        except UnicodeDecodeError:
-            return
-
     # Get rid of Ethernet pkts with just a raw load cuz these are usually network controls like flow control
     if pkt.haslayer(Ether) and pkt.haslayer(Raw) and not pkt.haslayer(IP) and not pkt.haslayer(IPv6):
         return
 
+    if not pkt.haslayer(IP):
+        return
+
     # UDP
-    if pkt.haslayer(UDP) and pkt.haslayer(IP):
+    if pkt.haslayer(UDP):
 
         src_ip_port = str(pkt[IP].src) + ':' + str(pkt[UDP].sport)
         dst_ip_port = str(pkt[IP].dst) + ':' + str(pkt[UDP].dport)
@@ -103,71 +101,42 @@ def pkt_parser(pkt):
             return
 
         # Kerberos over UDP
-        decoded = Decode_Ip_Packet(str(pkt)[14:])
-        kerb_hash = ParseMSKerbv5UDP(decoded['data'][8:])
-        if kerb_hash:
-            printer(src_ip_port, dst_ip_port, kerb_hash)
+        if pkt.haslayer(Kerberos):
+            parse_udp_kerberos(src_ip_port, dst_ip_port, pkt)
+            return
 
     # TCP
-    elif pkt.haslayer(TCP) and pkt.haslayer(Raw) and pkt.haslayer(IP):
+    elif pkt.haslayer(TCP) and pkt.haslayer(Raw):
 
         ack = str(pkt[TCP].ack)
         seq = str(pkt[TCP].seq)
         src_ip_port = str(pkt[IP].src) + ':' + str(pkt[TCP].sport)
         dst_ip_port = str(pkt[IP].dst) + ':' + str(pkt[TCP].dport)
-        frag_remover()
-        pkt_frag_loads[src_ip_port] = frag_joiner(ack, src_ip_port, load)
+        remove_frags_if_necessary()
+
+        try:
+            load_decoded = pkt[Raw].load.decode("UTF-8")
+        except UnicodeDecodeError:
+            return
+        pkt_frag_loads[src_ip_port] = frag_joiner(ack, src_ip_port, load_decoded)
         full_load = pkt_frag_loads[src_ip_port][ack]
 
         # Limit the packets we regex to increase efficiency
         # 750 is a bit arbitrary but some SMTP auth success pkts
         # are 500+ characters
         if 0 < len(full_load) < 750:
+            ftp_creds = parse_ftp(full_load, dst_ip_port, src_ip_port)
 
-            # FTP
-            ftp_creds = parse_ftp(full_load, dst_ip_port)
-            if len(ftp_creds) > 0:
-                for msg in ftp_creds:
-                    printer(src_ip_port, dst_ip_port, msg)
-                return
+            mail_creds = mail_logins(full_load, src_ip_port, dst_ip_port, ack, seq)
 
-            # Mail
-            mail_creds_found = mail_logins(full_load, src_ip_port, dst_ip_port, ack, seq)
+            irc_creds = irc_logins(full_load, pkt, dst_ip_port, src_ip_port)
 
-            # IRC
-            irc_creds = irc_logins(full_load, pkt)
-            if irc_creds != None:
-                printer(src_ip_port, dst_ip_port, irc_creds)
-                return
+            telnet_creds = telnet_logins(src_ip_port, dst_ip_port, load_decoded, ack, seq)
 
-            # Telnet
-            telnet_logins(src_ip_port, dst_ip_port, load, ack, seq)
+        http_creds = parse_http_load(full_load, src_ip_port, dst_ip_port)
 
-        # HTTP and other protocols that run on TCP + a raw load
-        other_parser(src_ip_port, dst_ip_port, full_load, ack, seq, pkt)
+        kerberos_creds = parse_tcp_kerberos(src_ip_port, dst_ip_port, pkt)
 
+        nonnet_ntlm_creds = parse_nonnet_ntlm(full_load, ack, seq, src_ip_port, dst_ip_port)
 
-def other_parser(src_ip_port, dst_ip_port, full_load, ack, seq, pkt):
-    # HTTP
-    parse_http_load(full_load, src_ip_port, dst_ip_port)
-
-    # Kerberos over TCP
-    decoded = Decode_Ip_Packet(str(pkt)[14:])
-    kerb_hash = ParseMSKerbv5TCP(decoded['data'][20:])
-    if kerb_hash:
-        printer(src_ip_port, dst_ip_port, kerb_hash)
-
-    # Non-NETNTLM NTLM hashes (MSSQL, DCE-RPC,SMBv1/2,LDAP, MSSQL)
-    NTLMSSP2 = re.search(NTLMSSP2_re, full_load, re.DOTALL)
-    NTLMSSP3 = re.search(NTLMSSP3_re, full_load, re.DOTALL)
-    if NTLMSSP2:
-        parse_ntlm_chal(NTLMSSP2.group(), ack)
-    if NTLMSSP3:
-        ntlm_resp_found = parse_ntlm_resp(NTLMSSP3.group(), seq)
-        if ntlm_resp_found != None:
-            printer(src_ip_port, dst_ip_port, ntlm_resp_found)
-
-    # NetNTLM
-    netntlm_found = parse_netntlm(full_load, ack, seq)
-    if netntlm_found != None:
-        printer(src_ip_port, dst_ip_port, netntlm_found)
+        netntlm_creds = parse_netntlm(full_load, ack, seq, src_ip_port, dst_ip_port)

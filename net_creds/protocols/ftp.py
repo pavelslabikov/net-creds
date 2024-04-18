@@ -1,12 +1,14 @@
 import re
 
+from net_creds.models import AuthData
+from net_creds.output import printer
 from net_creds.utils import double_line_checker
 
 ftp_user_re = r'USER (.+)\r\n'
 ftp_pw_re = r'PASS (.+)\r\n'
 
 
-def parse_ftp(full_load, dst_ip_port):
+def parse_ftp(full_load, dst_ip_port, src_ip_port):
     '''
     Parse out FTP creds
     '''
@@ -34,4 +36,6 @@ def parse_ftp(full_load, dst_ip_port):
             msg2 = 'Nonstandard FTP port, confirm the service that is running on it'
             print_strs.append(msg2)
 
-    return print_strs
+    for msg in print_strs:
+        printer(src_ip_port, dst_ip_port, msg)
+

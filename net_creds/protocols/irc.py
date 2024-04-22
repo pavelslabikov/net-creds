@@ -1,16 +1,18 @@
 import re
+from typing import Optional
 
-from net_creds.output import printer
+from net_creds.models import Credentials
 
 irc_user_re = r'NICK (.+?)((\r)?\n|\s)'
 irc_pw_re = r'NS IDENTIFY (.+)'
 irc_pw_re2 = 'nickserv :identify (.+)'
 
 
-def irc_logins(full_load, pkt, dst_ip_port, src_ip_port):
+def parse_irc(full_load, pkt, dst_ip_port, src_ip_port) -> Optional[Credentials]:
     '''
     Find IRC logins
     '''
+    creds = None
     user_search = re.match(irc_user_re, full_load)
     pass_search = re.match(irc_pw_re, full_load)
     pass_search2 = re.search(irc_pw_re2, full_load.lower())
@@ -22,4 +24,5 @@ def irc_logins(full_load, pkt, dst_ip_port, src_ip_port):
     if pass_search2:
         msg = 'IRC pass: %s' % pass_search2.group(1)
     if msg is not None:
-        printer(src_ip_port, dst_ip_port, msg)
+        creds = Credentials(src_ip_port, dst_ip_port, msg)
+    return creds

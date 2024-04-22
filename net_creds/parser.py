@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 
 import logging
+from typing import Optional
 
 from scapy.layers.inet import UDP, IP, TCP
 from scapy.layers.inet6 import IPv6
 from scapy.layers.kerberos import Kerberos
 from scapy.layers.snmp import SNMP
 
+from net_creds.models import Credentials
 from net_creds.protocols.ftp import parse_ftp
 from net_creds.protocols.http import parse_http_load
-from net_creds.protocols.irc import irc_logins
+from net_creds.protocols.irc import parse_irc
 from net_creds.protocols.kerberos import parse_udp_kerberos, \
     parse_tcp_kerberos
-from net_creds.protocols.mail import mail_logins
+from net_creds.protocols.mail import parse_mail
 from net_creds.protocols.ntlm import parse_netntlm, parse_nonnet_ntlm
 from net_creds.protocols.snmp import parse_snmp
-from net_creds.protocols.telnet import telnet_logins
+from net_creds.protocols.telnet import parse_telnet
 
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import *
@@ -61,7 +63,7 @@ def remove_frags_if_necessary():
                 pkt_frag_loads[ip_port][ack] = pkt_frag_loads[ip_port][ack][-200:]
 
 
-def frag_joiner(ack, src_ip_port, load):
+def join_frags(ack, src_ip_port, load):
     '''
     Keep a store of previous fragments in an OrderedDict named pkt_frag_loads
     '''
@@ -76,7 +78,7 @@ def frag_joiner(ack, src_ip_port, load):
     return OrderedDict([(ack, load)])
 
 
-def parse_creds_from_packet(pkt):
+def parse_creds_from_packet(pkt: Packet):
     '''
     Start parsing packets here
     '''
@@ -89,6 +91,15 @@ def parse_creds_from_packet(pkt):
     if not pkt.haslayer(IP):
         return
 
+    creds_list = extract_creds(pkt)
+    for cred in creds_list:
+        # Escape colors like whatweb has
+        ansi_escape = re.compile(r'\x1b[^m]*m')
+        print_str = ansi_escape.sub('', str(cred))
+        logging.info(print_str)
+
+
+def extract_creds(pkt: Packet) -> List[Credentials]:
     # UDP
     if pkt.haslayer(UDP):
 
@@ -97,16 +108,16 @@ def parse_creds_from_packet(pkt):
 
         # SNMP community strings
         if pkt.haslayer(SNMP):
-            parse_snmp(src_ip_port, dst_ip_port, pkt[SNMP])
-            return
+            return [parse_snmp(src_ip_port, dst_ip_port, pkt[SNMP])]
 
         # Kerberos over UDP
         if pkt.haslayer(Kerberos):
-            parse_udp_kerberos(src_ip_port, dst_ip_port, pkt)
-            return
+            return [parse_udp_kerberos(src_ip_port, dst_ip_port, pkt)]
+
 
     # TCP
     elif pkt.haslayer(TCP) and pkt.haslayer(Raw):
+        creds_list = []
 
         ack = str(pkt[TCP].ack)
         seq = str(pkt[TCP].seq)
@@ -117,26 +128,22 @@ def parse_creds_from_packet(pkt):
         try:
             load_decoded = pkt[Raw].load.decode("UTF-8")
         except UnicodeDecodeError:
-            return
-        pkt_frag_loads[src_ip_port] = frag_joiner(ack, src_ip_port, load_decoded)
+            return creds_list
+
+        pkt_frag_loads[src_ip_port] = join_frags(ack, src_ip_port, load_decoded)
         full_load = pkt_frag_loads[src_ip_port][ack]
 
         # Limit the packets we regex to increase efficiency
         # 750 is a bit arbitrary but some SMTP auth success pkts
         # are 500+ characters
         if 0 < len(full_load) < 750:
-            ftp_creds = parse_ftp(full_load, dst_ip_port, src_ip_port)
+            creds_list.append(parse_ftp(full_load, dst_ip_port, src_ip_port))
+            creds_list.append(parse_mail(full_load, src_ip_port, dst_ip_port, ack, seq))
+            creds_list.append(parse_irc(full_load, pkt, dst_ip_port, src_ip_port))
+            creds_list.append(parse_telnet(src_ip_port, dst_ip_port, load_decoded, ack, seq))
 
-            mail_creds = mail_logins(full_load, src_ip_port, dst_ip_port, ack, seq)
-
-            irc_creds = irc_logins(full_load, pkt, dst_ip_port, src_ip_port)
-
-            telnet_creds = telnet_logins(src_ip_port, dst_ip_port, load_decoded, ack, seq)
-
-        http_creds = parse_http_load(full_load, src_ip_port, dst_ip_port)
-
-        kerberos_creds = parse_tcp_kerberos(src_ip_port, dst_ip_port, pkt)
-
-        nonnet_ntlm_creds = parse_nonnet_ntlm(full_load, ack, seq, src_ip_port, dst_ip_port)
-
-        netntlm_creds = parse_netntlm(full_load, ack, seq, src_ip_port, dst_ip_port)
+        creds_list.append(parse_http_load(full_load, src_ip_port, dst_ip_port))
+        creds_list.append(parse_tcp_kerberos(src_ip_port, dst_ip_port, pkt))
+        creds_list.append(parse_nonnet_ntlm(full_load, ack, seq, src_ip_port, dst_ip_port))
+        creds_list.append(parse_netntlm(full_load, ack, seq, src_ip_port, dst_ip_port))
+        return creds_list

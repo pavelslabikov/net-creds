@@ -1,20 +1,25 @@
 import struct
+from typing import Optional
 
-from net_creds.output import printer
+from net_creds.models import Credentials
 
 
-def parse_udp_kerberos(src_ip_port, dst_ip_port, pkt):
+def parse_udp_kerberos(src_ip_port, dst_ip_port, pkt) -> Optional[Credentials]:
+    creds = None
     decoded = Decode_Ip_Packet(str(pkt)[14:])
     kerb_hash = ParseMSKerbv5UDP(decoded['data'][8:])
     if kerb_hash:
-        printer(src_ip_port, dst_ip_port, kerb_hash)
+        creds = Credentials(src_ip_port, dst_ip_port, kerb_hash)
+    return creds
 
 
-def parse_tcp_kerberos(src_ip_port, dst_ip_port, pkt):
+def parse_tcp_kerberos(src_ip_port, dst_ip_port, pkt) -> Optional[Credentials]:
+    creds = None
     decoded = Decode_Ip_Packet(str(pkt)[14:])
     kerb_hash = ParseMSKerbv5TCP(decoded['data'][20:])
     if kerb_hash:
-        printer(src_ip_port, dst_ip_port, kerb_hash)
+        creds = Credentials(src_ip_port, dst_ip_port, kerb_hash)
+    return creds
 
 
 def ParseMSKerbv5TCP(Data):

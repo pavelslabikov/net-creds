@@ -1,23 +1,23 @@
 from collections import OrderedDict
+from typing import Optional
 
-from net_creds.output import printer
+from net_creds.models import Credentials
 
 telnet_stream = OrderedDict()
 
 
-def telnet_logins(src_ip_port, dst_ip_port, load, ack, seq):
+def parse_telnet(src_ip_port, dst_ip_port, load, ack, seq) -> Optional[Credentials]:
     '''
     Catch telnet logins and passwords
     '''
     global telnet_stream
 
-    msg = None
+    creds = None
 
     if src_ip_port in telnet_stream:
         # Do a utf decode in case the client sends telnet options before their username
         # No one would care to see that
         telnet_stream[src_ip_port] += load
-
 
         # \r or \r\n or \n terminate commands in telnet if my pcaps are to be believed
         if '\r' in telnet_stream[src_ip_port] or '\n' in telnet_stream[src_ip_port]:
@@ -26,7 +26,7 @@ def telnet_logins(src_ip_port, dst_ip_port, load, ack, seq):
             value = telnet_split[1].replace('\r\n', '').replace('\r', '').replace('\n', '')
             # Create msg, the return variable
             msg = 'Telnet %s: %s' % (cred_type, value)
-            printer(src_ip_port, dst_ip_port, msg)
+            creds = Credentials(src_ip_port, dst_ip_port, msg)
             del telnet_stream[src_ip_port]
 
     # This part relies on the telnet packet ending in
@@ -41,3 +41,4 @@ def telnet_logins(src_ip_port, dst_ip_port, load, ack, seq):
         telnet_stream[dst_ip_port] = 'username '
     elif mod_load.endswith('password:'):
         telnet_stream[dst_ip_port] = 'password '
+    return creds

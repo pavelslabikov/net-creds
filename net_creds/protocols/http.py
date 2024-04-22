@@ -1,8 +1,10 @@
 import base64
+import logging
 import re
+from typing import Optional
 from urllib.parse import unquote
 
-from net_creds.output import printer
+from net_creds.models import Credentials
 
 http_search_re = '((search|query|&q|\?q|search\?p|searchterm|keywords|keyword|command|terms|keys|question|kwd|searchPhrase)=([^&][^&]*))'
 
@@ -41,10 +43,11 @@ def get_http_searches(http_url_req, body, host):
         return msg
 
 
-def parse_basic_auth(src_ip_port, dst_ip_port, headers, authorization_header):
+def parse_basic_auth(src_ip_port, dst_ip_port, headers, authorization_header) -> Optional[Credentials]:
     '''
     Parse basic authentication over HTTP
     '''
+    creds = None
     if authorization_header:
         # authorization_header sometimes is triggered by failed ftp
         try:
@@ -59,8 +62,8 @@ def parse_basic_auth(src_ip_port, dst_ip_port, headers, authorization_header):
             except Exception:
                 return
             msg = 'Basic Authentication: %s' % basic_auth_creds
-            printer(src_ip_port, dst_ip_port, msg)
-
+            creds = Credentials(src_ip_port, dst_ip_port, msg)
+    return creds
 
 def get_http_url(method, host, path, headers):
     '''
@@ -119,10 +122,11 @@ def parse_http_line(http_line, http_methods):
     return method, path
 
 
-def parse_http_load(full_load, src_ip_port, dst_ip_port):
+def parse_http_load(full_load, src_ip_port, dst_ip_port) -> Optional[Credentials]:
     '''
     Split the raw load into list of headers and body string
     '''
+    creds = None
     http_methods = ['GET ', 'POST ', 'CONNECT ', 'TRACE ', 'TRACK ', 'PUT ', 'DELETE ', 'HEAD ']
     try:
         headers, body = full_load.split("\r\n\r\n", 1)
@@ -150,7 +154,7 @@ def parse_http_load(full_load, src_ip_port, dst_ip_port):
         method, path = parse_http_line(http_line, http_methods)
         http_url_req = get_http_url(method, host, path, headers)
         if http_url_req != None:
-            printer(src_ip_port, None, http_url_req)
+            logging.info(f'[{src_ip_port.split(":")[0]}] {http_url_req}')
 
     # Print user/pwds
     if body != '':
@@ -162,10 +166,7 @@ def parse_http_load(full_load, src_ip_port, dst_ip_port):
                 # Set a limit on how long they can be prevent false+
                 if len(http_user) > 75 or len(http_pass) > 75:
                     return
-                user_msg = 'HTTP username: %s' % http_user
-                printer(src_ip_port, dst_ip_port, user_msg)
-                pass_msg = 'HTTP password: %s' % http_pass
-                printer(src_ip_port, dst_ip_port, pass_msg)
+                creds = Credentials(src_ip_port, dst_ip_port, f'HTTP authentication: {http_user}:{http_pass}')
             except UnicodeDecodeError:
                 pass
 
@@ -181,9 +182,9 @@ def parse_http_load(full_load, src_ip_port, dst_ip_port):
 
     # Basic Auth
     if authorization_header or authenticate_header:
-        parse_basic_auth(src_ip_port, dst_ip_port, headers, authorization_header)
+        return parse_basic_auth(src_ip_port, dst_ip_port, headers, authorization_header)
 
-    return http_line, header_lines, body
+    return creds
 
 
 def get_http_line(header_lines, http_methods):

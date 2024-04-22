@@ -3,8 +3,9 @@ import binascii
 import re
 import struct
 from collections import OrderedDict
+from typing import Optional
 
-from net_creds.output import printer
+from net_creds.models import Credentials
 
 challenge_acks = OrderedDict()
 NTLMSSP2_re = 'NTLMSSP\x00\x02\x00\x00\x00.+'
@@ -14,10 +15,11 @@ authenticate_re = '(www-|proxy-)?authenticate'
 authorization_re = '(www-|proxy-)?authorization'
 
 
-def parse_nonnet_ntlm(full_load, ack, seq, src_ip_port, dst_ip_port):
+def parse_nonnet_ntlm(full_load, ack, seq, src_ip_port, dst_ip_port) -> Optional[Credentials]:
     # Non-NETNTLM NTLM hashes (MSSQL, DCE-RPC,SMBv1/2,LDAP, MSSQL)
     NTLMSSP2 = re.search(NTLMSSP2_re, full_load, re.DOTALL)
     NTLMSSP3 = re.search(NTLMSSP3_re, full_load, re.DOTALL)
+    creds = None
     msg = None
     if NTLMSSP2:
         parse_challenge(NTLMSSP2.group(), ack)
@@ -25,13 +27,14 @@ def parse_nonnet_ntlm(full_load, ack, seq, src_ip_port, dst_ip_port):
         msg = parse_ntlm_resp(NTLMSSP3.group(), seq)
 
     if msg is not None:
-        printer(src_ip_port, dst_ip_port, msg)
+        creds = Credentials(src_ip_port, dst_ip_port, msg)
+    return creds
 
-
-def parse_netntlm(full_load, ack, seq, src_ip_port, dst_ip_port):
+def parse_netntlm(full_load, ack, seq, src_ip_port, dst_ip_port) -> Optional[Credentials]:
     '''
     Parse NTLM hashes out
     '''
+    creds = None
     try:
         headers, body = full_load.split("\r\n\r\n", 1)
     except ValueError:
@@ -60,7 +63,8 @@ def parse_netntlm(full_load, ack, seq, src_ip_port, dst_ip_port):
         msg = parse_netntlm_resp_msg(headers, resp_header, seq)
 
     if msg != None:
-        printer(src_ip_port, dst_ip_port, msg)
+        creds = Credentials(src_ip_port, dst_ip_port, msg)
+    return creds
 
 
 def headers_to_dict(header_lines):

@@ -1,8 +1,10 @@
 import base64
+import logging
 import re
 from collections import OrderedDict
+from typing import Optional
 
-from net_creds.output import printer
+from net_creds.models import Credentials
 from net_creds.utils import double_line_checker
 
 mail_auth_re = '(\d+ )?(auth|authenticate) (login|plain)'
@@ -24,11 +26,11 @@ def mail_decode(src_ip_port, dst_ip_port, mail_creds):
         decoded = None
 
     if decoded != None:
-        msg = 'Decoded: %s' % decoded
-        printer(src_ip_port, dst_ip_port, msg)
+        msg = 'Decoded mail credentials: %s' % decoded
+        logging.info(f"[{src_ip_port} -> {dst_ip_port}] {msg}")
 
 
-def mail_logins(full_load, src_ip_port, dst_ip_port, ack, seq):
+def parse_mail(full_load, src_ip_port, dst_ip_port, ack, seq) -> Optional[Credentials]:
     '''
     Catch IMAP, POP, and SMTP logins
     '''
@@ -38,6 +40,7 @@ def mail_logins(full_load, src_ip_port, dst_ip_port, ack, seq):
     # mail_auths = 192.168.0.2 : [1st ack, 2nd ack...]
     global mail_auths
     found = False
+    creds = None
 
     # Sometimes mail packets double up on the authentication lines
     # We just want the lastest one. Ex: "1 auth plain\r\n2 auth plain\r\n"
@@ -49,8 +52,7 @@ def mail_logins(full_load, src_ip_port, dst_ip_port, ack, seq):
             stripped = full_load.strip('\r\n')
             try:
                 decoded = base64.b64decode(stripped)
-                msg = 'Mail authentication: %s' % decoded
-                printer(src_ip_port, dst_ip_port, msg)
+                creds = Credentials(src_ip_port, dst_ip_port, 'Mail authentication: %s' % decoded)
             except TypeError:
                 pass
             mail_auths[src_ip_port].append(ack)
@@ -60,12 +62,12 @@ def mail_logins(full_load, src_ip_port, dst_ip_port, ack, seq):
     elif dst_ip_port in mail_auths:
         if seq in mail_auths[dst_ip_port][-1]:
             # Look for any kind of auth failure or success
-            a_s = 'Authentication successful'
-            a_f = 'Authentication failed'
+            a_s = 'Mail authentication successful'
+            a_f = 'Mail authentication failed'
             # SMTP auth was successful
             if full_load.startswith('235') and 'auth' in full_load.lower():
                 # Reversed the dst and src
-                printer(dst_ip_port, src_ip_port, a_s)
+                logging.info(f"[{src_ip_port} -> {dst_ip_port}] {a_s}")
                 found = True
                 try:
                     del mail_auths[dst_ip_port]
@@ -74,7 +76,7 @@ def mail_logins(full_load, src_ip_port, dst_ip_port, ack, seq):
             # SMTP failed
             elif full_load.startswith('535 '):
                 # Reversed the dst and src
-                printer(dst_ip_port, src_ip_port, a_f)
+                logging.info(f"[{src_ip_port} -> {dst_ip_port}] {a_f}")
                 found = True
                 try:
                     del mail_auths[dst_ip_port]
@@ -83,7 +85,7 @@ def mail_logins(full_load, src_ip_port, dst_ip_port, ack, seq):
             # IMAP/POP/SMTP failed
             elif ' fail' in full_load.lower():
                 # Reversed the dst and src
-                printer(dst_ip_port, src_ip_port, a_f)
+                logging.info(f"[{src_ip_port} -> {dst_ip_port}] {a_f}")
                 found = True
                 try:
                     del mail_auths[dst_ip_port]
@@ -92,7 +94,7 @@ def mail_logins(full_load, src_ip_port, dst_ip_port, ack, seq):
             # IMAP auth success
             elif ' OK [' in full_load:
                 # Reversed the dst and src
-                printer(dst_ip_port, src_ip_port, a_s)
+                logging.info(f"[{src_ip_port} -> {dst_ip_port}] {a_s}")
                 found = True
                 try:
                     del mail_auths[dst_ip_port]
@@ -121,8 +123,7 @@ def mail_logins(full_load, src_ip_port, dst_ip_port, ack, seq):
             # rather than just an AUTH PLAIN
             if len(auth_msg) > 2:
                 mail_creds = ' '.join(auth_msg[2:])
-                msg = 'Mail authentication: %s' % mail_creds
-                printer(src_ip_port, dst_ip_port, msg)
+                creds = Credentials(src_ip_port, dst_ip_port, 'Mail authentication: %s' % mail_creds)
 
                 mail_decode(src_ip_port, dst_ip_port, mail_creds)
                 try:
@@ -151,10 +152,8 @@ def mail_logins(full_load, src_ip_port, dst_ip_port, ack, seq):
             auth_msg = auth_msg.split()
             if 2 < len(auth_msg) < 5:
                 mail_creds = ' '.join(auth_msg[2:])
-                msg = 'Authentication: %s' % mail_creds
-                printer(src_ip_port, dst_ip_port, msg)
+                creds = Credentials(src_ip_port, dst_ip_port, 'Mail authentication: %s' % mail_creds)
                 mail_decode(src_ip_port, dst_ip_port, mail_creds)
                 found = True
 
-    if found == True:
-        return True
+    return creds

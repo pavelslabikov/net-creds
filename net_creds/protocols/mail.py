@@ -9,6 +9,7 @@ from net_creds.utils import double_line_checker
 
 mail_auth_re = '(\d+ )?(auth|authenticate) (login|plain)'
 mail_auth_re1 = '(\d+ )?login '
+mail_auth_creds = r' (.+) (.+)'
 
 mail_auths = OrderedDict()
 
@@ -51,9 +52,10 @@ def parse_mail(full_load, src_ip_port, dst_ip_port, ack, seq) -> Optional[Creden
         if seq in mail_auths[src_ip_port][-1]:
             stripped = full_load.strip('\r\n')
             try:
-                decoded = base64.b64decode(stripped)
-                creds = Credentials(src_ip_port, dst_ip_port, 'Mail authentication: %s' % decoded)
-            except TypeError:
+                decoded = base64.b64decode(stripped).replace(b'\x00', b' ').decode("UTF-8")
+                if re.match(mail_auth_creds, decoded):
+                    creds = Credentials(src_ip_port, dst_ip_port, 'Mail authentication: %s' % decoded)
+            except Exception:
                 pass
             mail_auths[src_ip_port].append(ack)
 

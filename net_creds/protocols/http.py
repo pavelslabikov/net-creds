@@ -79,7 +79,7 @@ def get_http_url(method, host, path, headers):
 
         http_url_req = url_filter(http_url_req)
 
-        return http_url_req
+        return unquote(http_url_req)
 
 
 def headers_to_dict(header_lines):

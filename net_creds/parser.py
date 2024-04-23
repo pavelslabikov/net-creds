@@ -26,7 +26,7 @@ from scapy.layers.l2 import *
 conf.verb = 0
 from collections import OrderedDict
 
-logging.basicConfig(filename='../credentials.txt', level=logging.INFO)
+logging.basicConfig(level=logging.INFO)
 pkt_frag_loads = OrderedDict()
 
 
@@ -93,13 +93,11 @@ def parse_creds_from_packet(pkt: Packet):
 
     creds_list = extract_creds(pkt)
     for cred in creds_list:
-        # Escape colors like whatweb has
-        ansi_escape = re.compile(r'\x1b[^m]*m')
-        print_str = ansi_escape.sub('', str(cred))
-        logging.info(print_str)
+        logging.info(cred)
 
 
 def extract_creds(pkt: Packet) -> List[Credentials]:
+    creds_list = []
     # UDP
     if pkt.haslayer(UDP):
 
@@ -108,16 +106,15 @@ def extract_creds(pkt: Packet) -> List[Credentials]:
 
         # SNMP community strings
         if pkt.haslayer(SNMP):
-            return [parse_snmp(src_ip_port, dst_ip_port, pkt[SNMP])]
+            creds_list.append(parse_snmp(src_ip_port, dst_ip_port, pkt[SNMP]))
 
         # Kerberos over UDP
         if pkt.haslayer(Kerberos):
-            return [parse_udp_kerberos(src_ip_port, dst_ip_port, pkt)]
+            creds_list.append(parse_udp_kerberos(src_ip_port, dst_ip_port, pkt))
 
 
     # TCP
     elif pkt.haslayer(TCP) and pkt.haslayer(Raw):
-        creds_list = []
 
         ack = str(pkt[TCP].ack)
         seq = str(pkt[TCP].seq)
@@ -128,7 +125,7 @@ def extract_creds(pkt: Packet) -> List[Credentials]:
         try:
             load_decoded = pkt[Raw].load.decode("UTF-8")
         except UnicodeDecodeError:
-            return creds_list
+            return []
 
         pkt_frag_loads[src_ip_port] = join_frags(ack, src_ip_port, load_decoded)
         full_load = pkt_frag_loads[src_ip_port][ack]
@@ -139,11 +136,11 @@ def extract_creds(pkt: Packet) -> List[Credentials]:
         if 0 < len(full_load) < 750:
             creds_list.append(parse_ftp(full_load, dst_ip_port, src_ip_port))
             creds_list.append(parse_mail(full_load, src_ip_port, dst_ip_port, ack, seq))
-            creds_list.append(parse_irc(full_load, pkt, dst_ip_port, src_ip_port))
+            creds_list.append(parse_irc(load_decoded, pkt, dst_ip_port, src_ip_port))
             creds_list.append(parse_telnet(src_ip_port, dst_ip_port, load_decoded, ack, seq))
 
         creds_list.append(parse_http_load(full_load, src_ip_port, dst_ip_port))
         creds_list.append(parse_tcp_kerberos(src_ip_port, dst_ip_port, pkt))
         creds_list.append(parse_nonnet_ntlm(full_load, ack, seq, src_ip_port, dst_ip_port))
         creds_list.append(parse_netntlm(full_load, ack, seq, src_ip_port, dst_ip_port))
-        return creds_list
+    return list(filter(None, creds_list))

@@ -7,9 +7,7 @@ def parse_snmp(src_ip_port, dst_ip_port, snmp_layer) -> Optional[Credentials]:
     '''
     Parse out the SNMP version and community string
     '''
-    creds = None
-    if type(snmp_layer.community.val) == str:
-        ver = snmp_layer.version.val
-        msg = 'SNMPv%d community string: %s' % (ver, snmp_layer.community.val)
-        creds = Credentials(src_ip_port, dst_ip_port, msg)
+    ver = snmp_layer.version.val
+    msg = 'SNMPv%d community string: %s' % (ver, str(snmp_layer.community.val, "UTF-8"))
+    creds = Credentials(src_ip_port, dst_ip_port, msg)
     return creds

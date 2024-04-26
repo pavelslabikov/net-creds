@@ -1,17 +1,25 @@
 import argparse
-from os import devnull
+import logging
+
 from subprocess import Popen, PIPE, check_output
 from sys import exit
 
 import platform
 
+import psutil
 from scapy.config import conf
 from scapy.sendrecv import sniff
 from scapy.utils import PcapReader
 
 from net_creds.parser import parse_creds_from_packet
 
-DN = open(devnull, 'w')
+logging.basicConfig(level=logging.INFO)
+
+system_platform = platform.system()
+
+if system_platform != "Windows":
+    from os import devnull, geteuid
+    DN = open(devnull, 'w')
 
 
 def parse_args():
@@ -27,32 +35,32 @@ def parse_args():
 
 
 def auto_detect_iface():
-    system_platform = platform.system()
+
     if system_platform == 'Linux':
+        if geteuid():
+            logging.error('[-] Please run as root')
+            exit()
         ipr = Popen(['/sbin/ip', 'route'], stdout=PIPE, stderr=DN)
         for line in ipr.communicate()[0].splitlines():
             if 'default' in line:
                 l = line.split()
                 iface = l[4]
                 return iface
+    elif system_platform == "Windows":
+        stats = psutil.net_if_stats()
+        try:
+            return list(stats.keys())[0]
+        except IndexError:
+            logging.error("[-] There are no up and running interfaces")
+            exit()
     elif system_platform == 'Darwin':  # OSX support
         return check_output("route get 0.0.0.0 2>/dev/null| sed -n '5p' | cut -f4 -d' '", shell=True).rstrip()
     else:
-        exit('[-] Could not find an internet active interface; please specify one with -i <interface>')
+        logging.error('[-] Could not find an internet active interface; please specify one with -i <interface>')
+        exit()
 
 
 if __name__ == "__main__":
-    ##################### DEBUG ##########################
-    ## Hit Ctrl-C while program is running and you can see
-    ## whatever variable you want within the IPython cli
-    ## Don't forget to uncomment IPython in imports
-    # def signal_handler(signal, frame):
-    #    embed()
-    ##    sniff(iface=conf.iface, prn=pkt_parser, store=0)
-    #    sys.exit()
-    # signal.signal(signal.SIGINT, signal_handler)
-    ######################################################
-
     # Read packets from either pcap or interface
     args = parse_args()
     if args.pcap:
@@ -61,21 +69,18 @@ if __name__ == "__main__":
             for pkt in PcapReader(args.pcap):
                 parse_creds_from_packet(pkt)
         except IOError:
-            exit('[-] Could not open %s' % args.pcap)
+            logging.error('[-] Could not open ' + args.pcap)
+            exit()
 
     else:
-        # Check for root
-        # if geteuid():
-        #     exit('[-] Please run as root')
-
         # Find the active interface
         if args.interface:
-            conf.iface = args.interface
+            iface = args.interface
         else:
-            conf.iface = auto_detect_iface()
-        print('[*] Using interface:', conf.iface)
+            iface = auto_detect_iface()
+        logging.info('[*] Using interface: ' + iface)
 
         if args.filterip:
-            sniff(iface=conf.iface, prn=parse_creds_from_packet, filter="not host %s" % args.filterip, store=0)
+            sniff(iface=iface, prn=parse_creds_from_packet, filter="not host %s" % args.filterip, store=0)
         else:
-            sniff(iface=conf.iface, prn=parse_creds_from_packet, store=0)
+            sniff(iface=iface, prn=parse_creds_from_packet, store=0)

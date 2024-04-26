@@ -26,7 +26,7 @@ from scapy.layers.l2 import *
 conf.verb = 0
 from collections import OrderedDict
 
-logging.basicConfig(level=logging.INFO)
+
 pkt_frag_loads = OrderedDict()
 
 

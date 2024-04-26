@@ -1,8 +1,10 @@
 import argparse
 import logging
+import logging.config
 
 from subprocess import Popen, PIPE, check_output
 from sys import exit
+from sys import stdout
 
 import platform
 
@@ -13,7 +15,20 @@ from scapy.utils import PcapReader
 
 from net_creds.parser import parse_creds_from_packet
 
-logging.basicConfig(level=logging.INFO)
+formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)s | %(message)s')
+
+stdout_handler = logging.StreamHandler(stdout)
+stdout_handler.setLevel(logging.INFO)
+stdout_handler.setFormatter(formatter)
+
+root = logging.getLogger()
+root.propagate = False
+root.addHandler(stdout_handler)
+root.setLevel(logging.INFO)
+
+logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+
+logger = logging.getLogger(__name__)
 
 system_platform = platform.system()
 
@@ -27,18 +42,18 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--interface", help="Choose an interface")
     parser.add_argument("-p", "--pcap", help="Parse info from a pcap file; -p <pcapfilename>")
+    parser.add_argument("-l", "--logfile", help="Write logs to text file; -l <filename>")
     parser.add_argument("-f", "--filterip", help="Do not sniff packets from this IP address; -f 192.168.0.4")
     parser.add_argument("-v", "--verbose",
-                        help="Display entire URLs and POST loads rather than truncating at 100 characters",
+                        help="Increase logging level to DEBUG",
                         action="store_true")
     return parser.parse_args()
 
 
 def auto_detect_iface():
-
     if system_platform == 'Linux':
         if geteuid():
-            logging.error('[-] Please run as root')
+            logger.error('[-] Please run as root')
             exit()
         ipr = Popen(['/sbin/ip', 'route'], stdout=PIPE, stderr=DN)
         for line in ipr.communicate()[0].splitlines():
@@ -51,25 +66,36 @@ def auto_detect_iface():
         try:
             return list(stats.keys())[0]
         except IndexError:
-            logging.error("[-] There are no up and running interfaces")
+            logger.error("[-] There are no up and running interfaces")
             exit()
     elif system_platform == 'Darwin':  # OSX support
         return check_output("route get 0.0.0.0 2>/dev/null| sed -n '5p' | cut -f4 -d' '", shell=True).rstrip()
     else:
-        logging.error('[-] Could not find an internet active interface; please specify one with -i <interface>')
+        logger.error('[-] Could not find an internet active interface; please specify one with -i <interface>')
         exit()
 
 
 if __name__ == "__main__":
     # Read packets from either pcap or interface
     args = parse_args()
+    if args.verbose:
+        root.setLevel(logging.DEBUG)
+        stdout_handler.setLevel(logging.DEBUG)
+    if args.logfile:
+        file_handler = logging.FileHandler(args.logfile)
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(logging.DEBUG)
+        if args.verbose:
+            file_handler.setLevel(logging.DEBUG)
+        root.removeHandler(stdout_handler)
+        root.addHandler(file_handler)
     if args.pcap:
         try:
 
             for pkt in PcapReader(args.pcap):
                 parse_creds_from_packet(pkt)
         except IOError:
-            logging.error('[-] Could not open ' + args.pcap)
+            logger.error('[-] Could not open ' + args.pcap)
             exit()
 
     else:
@@ -78,7 +104,7 @@ if __name__ == "__main__":
             iface = args.interface
         else:
             iface = auto_detect_iface()
-        logging.info('[*] Using interface: ' + iface)
+        logger.info('[*] Using interface: ' + iface)
 
         if args.filterip:
             sniff(iface=iface, prn=parse_creds_from_packet, filter="not host %s" % args.filterip, store=0)

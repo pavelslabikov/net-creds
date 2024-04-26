@@ -11,6 +11,8 @@ http_search_re = '((search|query|&q|\?q|search\?p|searchterm|keywords|keyword|co
 authenticate_re = '(www-|proxy-)?authenticate'
 authorization_re = '(www-|proxy-)?authorization'
 
+logger = logging.getLogger(__name__)
+
 
 def get_http_searches(http_url_req, body, host):
     '''
@@ -154,7 +156,7 @@ def parse_http_load(full_load, src_ip_port, dst_ip_port) -> Optional[Credentials
         method, path = parse_http_line(http_line, http_methods)
         http_url_req = get_http_url(method, host, path, headers)
         if http_url_req != None:
-            logging.info(f'[{src_ip_port.split(":")[0]}] {http_url_req}')
+            logger.info(f'[{src_ip_port.split(":")[0]}] {http_url_req}')
 
     # Print user/pwds
     if body != '':

@@ -8,6 +8,8 @@ from net_creds.utils import double_line_checker
 ftp_user_re = r'USER (.+)\r\n'
 ftp_pw_re = r'PASS (.+)\r\n'
 
+logger = logging.getLogger(__name__)
+
 
 def parse_ftp(full_load, dst_ip_port, src_ip_port) -> Optional[Credentials]:
     '''
@@ -25,12 +27,12 @@ def parse_ftp(full_load, dst_ip_port, src_ip_port) -> Optional[Credentials]:
     if ftp_user:
         creds = Credentials(src_ip_port, dst_ip_port, 'FTP User: %s' % ftp_user.group(1).strip())
         if dst_ip_port[-3:] != ':21':
-            logging.info(f'[{src_ip_port} -> {dst_ip_port}] Nonstandard FTP port, confirm the service that is running on it')
+            logger.info(f'[{src_ip_port} -> {dst_ip_port}] Nonstandard FTP port, confirm the service that is running on it')
 
     elif ftp_pass:
         creds = Credentials(src_ip_port, dst_ip_port, 'FTP Pass: %s' % ftp_pass.group(1).strip())
         if dst_ip_port[-3:] != ':21':
-            logging.info(f'[{src_ip_port} -> {dst_ip_port}] Nonstandard FTP port, confirm the service that is running on it')
+            logger.info(f'[{src_ip_port} -> {dst_ip_port}] Nonstandard FTP port, confirm the service that is running on it')
 
     return creds
 

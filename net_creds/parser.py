@@ -19,7 +19,8 @@ from net_creds.protocols.ntlm import parse_netntlm, parse_nonnet_ntlm
 from net_creds.protocols.snmp import parse_snmp
 from net_creds.protocols.telnet import parse_telnet
 
-logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+
+logger = logging.getLogger(__name__)
 from scapy.all import *
 from scapy.layers.l2 import *
 
@@ -93,7 +94,7 @@ def parse_creds_from_packet(pkt: Packet):
 
     creds_list = extract_creds(pkt)
     for cred in creds_list:
-        logging.info(cred)
+        logger.info(cred)
 
 
 def extract_creds(pkt: Packet) -> List[Credentials]:
@@ -124,7 +125,7 @@ def extract_creds(pkt: Packet) -> List[Credentials]:
 
         try:
             load_decoded = pkt[Raw].load.decode("UTF-8")
-        except UnicodeDecodeError:
+        except UnicodeDecodeError as e:
             return []
 
         pkt_frag_loads[src_ip_port] = join_frags(ack, src_ip_port, load_decoded)

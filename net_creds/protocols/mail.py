@@ -13,6 +13,8 @@ mail_auth_creds = r' (.+) (.+)'
 
 mail_auths = OrderedDict()
 
+logger = logging.getLogger(__name__)
+
 
 def mail_decode(src_ip_port, dst_ip_port, mail_creds):
     '''
@@ -28,7 +30,7 @@ def mail_decode(src_ip_port, dst_ip_port, mail_creds):
 
     if decoded != None:
         msg = 'Decoded mail credentials: %s' % decoded
-        logging.info(f"[{src_ip_port} -> {dst_ip_port}] {msg}")
+        logger.info(f"[{src_ip_port} -> {dst_ip_port}] {msg}")
 
 
 def parse_mail(full_load, src_ip_port, dst_ip_port, ack, seq) -> Optional[Credentials]:
@@ -69,7 +71,7 @@ def parse_mail(full_load, src_ip_port, dst_ip_port, ack, seq) -> Optional[Creden
             # SMTP auth was successful
             if full_load.startswith('235') and 'auth' in full_load.lower():
                 # Reversed the dst and src
-                logging.info(f"[{src_ip_port} -> {dst_ip_port}] {a_s}")
+                logger.info(f"[{src_ip_port} -> {dst_ip_port}] {a_s}")
                 found = True
                 try:
                     del mail_auths[dst_ip_port]
@@ -78,7 +80,7 @@ def parse_mail(full_load, src_ip_port, dst_ip_port, ack, seq) -> Optional[Creden
             # SMTP failed
             elif full_load.startswith('535 '):
                 # Reversed the dst and src
-                logging.info(f"[{src_ip_port} -> {dst_ip_port}] {a_f}")
+                logger.info(f"[{src_ip_port} -> {dst_ip_port}] {a_f}")
                 found = True
                 try:
                     del mail_auths[dst_ip_port]
@@ -87,7 +89,7 @@ def parse_mail(full_load, src_ip_port, dst_ip_port, ack, seq) -> Optional[Creden
             # IMAP/POP/SMTP failed
             elif ' fail' in full_load.lower():
                 # Reversed the dst and src
-                logging.info(f"[{src_ip_port} -> {dst_ip_port}] {a_f}")
+                logger.info(f"[{src_ip_port} -> {dst_ip_port}] {a_f}")
                 found = True
                 try:
                     del mail_auths[dst_ip_port]
@@ -96,7 +98,7 @@ def parse_mail(full_load, src_ip_port, dst_ip_port, ack, seq) -> Optional[Creden
             # IMAP auth success
             elif ' OK [' in full_load:
                 # Reversed the dst and src
-                logging.info(f"[{src_ip_port} -> {dst_ip_port}] {a_s}")
+                logger.info(f"[{src_ip_port} -> {dst_ip_port}] {a_s}")
                 found = True
                 try:
                     del mail_auths[dst_ip_port]

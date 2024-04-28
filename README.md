@@ -1,17 +1,28 @@
-Thoroughly sniff passwords and hashes from an interface or pcap file. Concatenates fragmented packets and does not rely on ports for service identification. 
+# net-creds
+Утилита сниффит пароли и хэши из интерфейса или pcap файла. Конкатенирует фрагментированные пакеты и не полагается на номера портов для идентификации сетевых служб.
 
-| Screenshots |
-|:-----:|
-| ![Screenie1](http://imgur.com/opQo7Bb.png) |
-| ![Screenie2](http://imgur.com/Kl5I6Ju.png) |
+Все изменения, выполненные в рамках данного форка, являются ходом работы над практическим заданием от предприятия ООО "Уральский Центр Систем Безопасности".
+## TODO
+Модернизация:
+- [x] Переход на 3 версию Python
+- [x] Поддержка ОС Windows
+- [x] Переработка логики вывода результата + логгирование
 
-### Sniffs
+Рефакторинг:
+- [x] Реструктуризация проекта
+- [x] Создание доменной модели
 
-* URLs visited
+Тестирование:
+- [x] Подбор для каждого протокола по .pcap файлу, содержащего креды
+- [x] Написание интеграционных тестов с подобранными .pcap файлами
+
+
+## Функциональные возможности
+Сниффит:
+* Посещённые URLs
 * POST loads sent
 * HTTP form logins/passwords
 * HTTP basic auth logins/passwords
-* HTTP searches
 * FTP logins/passwords
 * IRC logins/passwords
 * POP logins/passwords
@@ -22,44 +33,26 @@ Thoroughly sniff passwords and hashes from an interface or pcap file. Concatenat
 * NTLMv1/v2 all supported protocols: HTTP, SMB, LDAP, etc.
 * Kerberos
 
-### Examples
+## Примеры запуска
 
-Auto-detect the interface to sniff
+### Linux
 
-`sudo python net-creds.py`
+Автоопределение интерфейса для сниффинга (выбирается первый попавшийся активный)
 
-Choose eth0 as the interface
+`sudo python -m net_creds`
 
-`sudo python net-creds.py -i eth0`
+Выбор eth0 для сниффинга
 
-Ignore packets to and from 192.168.0.2
+`sudo python -m net_creds -i eth0`
 
-`sudo python net-creds.py -f 192.168.0.2`
+Игнорирование пакетов от и до 192.168.0.2
 
-Read from pcap
+`sudo python -m net_creds -f 192.168.0.2`
 
-`python net-creds.py -p pcapfile`
+Чтение из pcap файла
 
+`python -m net_creds -p pcapfile`
 
-#### OS X
-
-Credit to [epocs](https://github.com/epocs):
-
-```bash
-sudo easy_install pip
-sudo pip install scapy
-sudo pip install pcapy
-brew install libdnet --with-python
-mkdir -p /Users/<username>/Library/Python/2.7/lib/python/site-packages
-echo 'import site; site.addsitedir("/usr/local/lib/python2.7/site-packages")' >> /Users/<username>/Library/Python/2.7/lib/python/site-packages/homebrew.pth
-sudo pip install pypcap
-brew tap brona/iproute2mac
-brew install iproute2mac
-```
-
-Then replace line 74 '/sbin/ip' with '/usr/local/bin/ip'.
-
-
-#### Thanks
+## Благодарности
 * Laurent Gaffie
 * psychomario

@@ -29,6 +29,7 @@ from collections import OrderedDict
 
 
 pkt_frag_loads = OrderedDict()
+result_creds_list = []
 
 
 def remove_frags_if_necessary():
@@ -83,7 +84,7 @@ def parse_creds_from_packet(pkt: Packet):
     '''
     Start parsing packets here
     '''
-    global pkt_frag_loads
+    global pkt_frag_loads, result_creds_list
 
     # Get rid of Ethernet pkts with just a raw load cuz these are usually network controls like flow control
     if pkt.haslayer(Ether) and pkt.haslayer(Raw) and not pkt.haslayer(IP) and not pkt.haslayer(IPv6):
@@ -95,6 +96,7 @@ def parse_creds_from_packet(pkt: Packet):
     creds_list = extract_creds(pkt)
     for cred in creds_list:
         logger.info(cred)
+    result_creds_list.extend(creds_list)
 
 
 def extract_creds(pkt: Packet) -> List[Credentials]:

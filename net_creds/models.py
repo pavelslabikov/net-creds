@@ -11,6 +11,9 @@ class Credentials:
     def __str__(self):
         return f"[{self.src_ip_port} -> {self.dst_ip_port}] {self.value}"
 
+    def __repr__(self):
+        return str(self)
+
     src_ip_port: str
     dst_ip_port: str
     value: str

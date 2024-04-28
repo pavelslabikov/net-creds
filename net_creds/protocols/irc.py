@@ -22,5 +22,5 @@ def parse_irc(packet_payload, pkt, dst_ip_port, src_ip_port) -> Optional[Credent
     if pass_search3:
         msg = 'IRC pass: %s' % pass_search3.group(1)
     if msg is not None:
-        creds = Credentials(src_ip_port, dst_ip_port, msg)
+        creds = Credentials(src_ip_port, dst_ip_port, msg.rstrip("\r\n"))
     return creds

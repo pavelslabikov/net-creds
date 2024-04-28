@@ -4,17 +4,17 @@
 Все изменения, выполненные в рамках данного форка, являются ходом работы над практическим заданием от предприятия ООО "Уральский Центр Систем Безопасности".
 ## TODO
 Модернизация:
-- [x] Переход на 3 версию Python
-- [x] Поддержка ОС Windows
-- [x] Переработка логики вывода результата + логгирование
+- [x] Переход на 3 версию Python ([a05c6a](https://github.com/pavelslabikov/net-creds/commit/a05c6a421e427ee9cd3597c9e656220065a1c26f))
+- [x] Поддержка ОС Windows ([c307a2](https://github.com/pavelslabikov/net-creds/commit/c307a290c49a0bdda8f05d5c1fff4cb5855010e3))
+- [x] Переработка логики вывода результата + логгирование ([43a2e5](https://github.com/pavelslabikov/net-creds/commit/43a2e5982c279526cefb3614e3390594a6477b84))
 
 Рефакторинг:
-- [x] Реструктуризация проекта
-- [x] Создание доменной модели
+- [x] Реструктуризация проекта ([f805a0](https://github.com/pavelslabikov/net-creds/commit/f805a0a3bd33d350e90c5c587f40f47944164193))
+- [x] Создание доменной модели ([d9be1e](https://github.com/pavelslabikov/net-creds/commit/d9be1e453d829bd14ce1b6dd9fd3a73c12d8cd47))
 
 Тестирование:
-- [x] Подбор для каждого протокола по .pcap файлу, содержащего креды
-- [x] Написание интеграционных тестов с подобранными .pcap файлами
+- [x] Подбор для каждого протокола по .pcap файлу, содержащего креды ([167550](https://github.com/pavelslabikov/net-creds/commit/1675508e5c83c56cd3c737206b2a63d5d55c145e))
+- [x] Написание интеграционных тестов с подобранными .pcap файлами ([df65fd](https://github.com/pavelslabikov/net-creds/commit/df65fd14263584af5e09a0be5a45dde8d5fa1789))
 
 
 ## Функциональные возможности

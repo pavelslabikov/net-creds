@@ -33,6 +33,14 @@
 * NTLMv1/v2 all supported protocols: HTTP, SMB, LDAP, etc.
 * Kerberos
 
+## Установка
+Поддерживаемая версия Python >= 3.7
+```commandline
+git clone git@github.com:pavelslabikov/net-creds.git
+cd net-creds
+pip install -r requirements.txt
+```
+
 ## Примеры запуска
 
 ### Linux
@@ -52,6 +60,11 @@
 Чтение из pcap файла
 
 `python -m net_creds -p pcapfile`
+
+### Windows
+Выбор сетевого адаптера с именем "Беспроводная сеть" для сниффинга:
+
+`python -m net_creds -i "Беспроводная сеть"`
 
 ## Благодарности
 * Laurent Gaffie

@@ -18,7 +18,7 @@ def parse_udp_kerberos(src_ip_port, dst_ip_port, pkt) -> Optional[Credentials]:
                 kerb_hash = padata.padataValue.cipher.val.hex()
         snames = list(map(lambda s: str(s.val, "UTF-8"), kerb_root.reqBody.sname.nameString))
         cnames = list(map(lambda s: str(s.val, "UTF-8"), kerb_root.reqBody.cname.nameString))
-        msg = f"UDP Kerberos | SNAME = {" ".join(snames)} | CNAME = {" ".join(cnames)} | Hash = {kerb_hash}"
+        msg = f'UDP Kerberos | SNAME = {" ".join(snames)} | CNAME = {" ".join(cnames)} | Hash = {kerb_hash}'
         creds = Credentials(src_ip_port, dst_ip_port, msg)
     return creds
 

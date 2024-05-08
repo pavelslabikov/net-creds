@@ -1,15 +1,25 @@
 import struct
 from typing import Optional
 
+from scapy.layers.inet import IP, UDP
+from scapy.layers.kerberos import Kerberos, KRB_AS_REQ
+from scapy.packet import Raw
+
 from net_creds.models import Credentials
 
 
 def parse_udp_kerberos(src_ip_port, dst_ip_port, pkt) -> Optional[Credentials]:
     creds = None
-    decoded = Decode_Ip_Packet(str(pkt)[14:])
-    kerb_hash = ParseMSKerbv5UDP(decoded['data'][8:])
-    if kerb_hash:
-        creds = Credentials(src_ip_port, dst_ip_port, kerb_hash)
+    kerb_root = pkt[Kerberos].root
+    if isinstance(kerb_root, KRB_AS_REQ):
+        kerb_hash = None
+        for padata in kerb_root.padata:
+            if padata.padataType == 2:
+                kerb_hash = padata.padataValue.cipher.val.hex()
+        snames = list(map(lambda s: str(s.val, "UTF-8"), kerb_root.reqBody.sname.nameString))
+        cnames = list(map(lambda s: str(s.val, "UTF-8"), kerb_root.reqBody.cname.nameString))
+        msg = f"UDP Kerberos | SNAME = {" ".join(snames)} | CNAME = {" ".join(cnames)} | Hash = {kerb_hash}"
+        creds = Credentials(src_ip_port, dst_ip_port, msg)
     return creds
 
 
@@ -78,7 +88,6 @@ def ParseMSKerbv5UDP(Data):
     Maybe replace this eventually with the kerberos python lib
     Parses Kerberosv5 hashes from packets
     '''
-
     try:
         MsgType = Data[17:18]
         EncType = Data[39:40]

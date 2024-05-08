@@ -36,7 +36,7 @@
 ## Установка
 Поддерживаемая версия Python >= 3.7
 ```commandline
-git clone git@github.com:pavelslabikov/net-creds.git
+git clone https://github.com/pavelslabikov/net-creds.git
 cd net-creds
 pip install -r requirements.txt
 ```
@@ -47,19 +47,19 @@ pip install -r requirements.txt
 
 Автоопределение интерфейса для сниффинга (выбирается первый попавшийся активный)
 
-`sudo python -m net_creds`
+`sudo python3 -m net_creds`
 
 Выбор eth0 для сниффинга
 
-`sudo python -m net_creds -i eth0`
+`sudo python3 -m net_creds -i eth0`
 
 Игнорирование пакетов от и до 192.168.0.2
 
-`sudo python -m net_creds -f 192.168.0.2`
+`sudo python3 -m net_creds -f 192.168.0.2`
 
 Чтение из pcap файла
 
-`python -m net_creds -p pcapfile`
+`sudo python3 -m net_creds -p pcapfile`
 
 ### Windows
 Выбор сетевого адаптера с именем "Беспроводная сеть" для сниффинга:

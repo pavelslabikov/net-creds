@@ -57,10 +57,9 @@ def auto_detect_iface():
             exit()
         ipr = Popen(['/sbin/ip', 'route'], stdout=PIPE, stderr=DN)
         for line in ipr.communicate()[0].splitlines():
-            if 'default' in line:
+            if 'default' in str(line, "UTF-8"):
                 l = line.split()
-                iface = l[4]
-                return iface
+                return l[4]
     elif system_platform == "Windows":
         stats = psutil.net_if_stats()
         try:

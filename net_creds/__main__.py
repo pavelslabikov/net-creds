@@ -58,7 +58,7 @@ def auto_detect_iface():
         ipr = Popen(['/sbin/ip', 'route'], stdout=PIPE, stderr=DN)
         for line in ipr.communicate()[0].splitlines():
             if 'default' in str(line, "UTF-8"):
-                l = line.split()
+                l = str(line, "UTF-8").split()
                 return l[4]
     elif system_platform == "Windows":
         stats = psutil.net_if_stats()
@@ -67,8 +67,6 @@ def auto_detect_iface():
         except IndexError:
             logger.error("[-] There are no up and running interfaces")
             exit()
-    elif system_platform == 'Darwin':  # OSX support
-        return check_output("route get 0.0.0.0 2>/dev/null| sed -n '5p' | cut -f4 -d' '", shell=True).rstrip()
     else:
         logger.error('[-] Could not find an internet active interface; please specify one with -i <interface>')
         exit()
